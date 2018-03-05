@@ -17,7 +17,7 @@
 						v-for="sticker in favoriteStickers"
 						v-bind:key="sticker.id">
 						<div class="image"
-							v-bind:style="{ 'background-image': 'url(' + baseURL + '/' + sticker.pack + '/' + sticker.id.replace('.png', '_key.png') + ')' }"
+							v-bind:style="{ 'background-image': 'url(' + formatURL(sticker.pack, sticker.id) + ')' }"
 							@click="sendSticker(sticker.pack, sticker.id)"></div>
 						<div class="deleteFavorite" @click="unfavoriteSticker(sticker.pack, sticker.id)">
 							<svg width="20" height="20" viewBox="0 0 24 24">
@@ -32,7 +32,7 @@
 						v-for="sticker in pack.files"
 						v-bind:key="sticker">
 						<div class="image"
-							v-bind:style="{ 'background-image': 'url(' + baseURL + '/' + pack.id + '/' + sticker.replace('.png', '_key.png') + ')' }"
+							v-bind:style="{ 'background-image': 'url(' + formatURL(pack.id, sticker) + ')' }"
 							@click="sendSticker(pack.id, sticker)"></div>
 						<div class="addFavorite" @click="favoriteSticker(pack.id, sticker)">
 							<svg width="20" height="20" viewBox="0 0 24 24">
@@ -66,7 +66,7 @@
 				<div class="pack"
 					v-for="pack in subscribedPacks"
 					v-bind:key="pack.id"
-					v-bind:style="{ 'background-image': 'url(' + baseURL + '/' + pack.id + '/tab_on.png' + ')' }"
+					v-bind:style="{ 'background-image': 'url(' + formatURL(pack.id, 'tab_on.png') + ')' }"
 					v-scroll-to="{
 						el: '#p' + pack.id,
 						container: '#stickers',
@@ -95,7 +95,7 @@
 						<div class="tabContent" v-show="activeTab == 0">
 							<div class="pack" v-for="pack in subscribedPacks" v-bind:key="pack.id">
 								<div class="preview"
-									v-bind:style="{ 'background-image': 'url(' + baseURL + '/' + pack.id + '/' + pack.files[0].replace('.png', '_key.png') + ')' }">
+									v-bind:style="{ 'background-image': 'url(' + formatURL(pack.id, pack.files[0]) + ')' }">
 								</div>
 								<div class="info">
 									<span>{{ pack.name }}</span>
@@ -112,7 +112,7 @@
 						<div class="tabContent" v-show="activeTab == 1">
 							<div class="pack" v-for="pack in availablePacks" v-bind:key="pack.id">
 								<div class="preview"
-									v-bind:style="{ 'background-image': 'url(' + baseURL + '/' + pack.id + '/' + pack.files[0].replace('.png', '_key.png') + ')' }">
+									v-bind:style="{ 'background-image': 'url(' + formatURL(pack.id, pack.files[0]) + ')' }">
 								</div>
 								<div class="info">
 									<span>{{ pack.name }}</span>
@@ -137,6 +137,7 @@ export default {
 	name: 'app',
 	mounted() {
 		console.log('Magane mounted on DOM');
+		window.maganeAppendPack = this.appendPack;
 		this.getLocalStorage();
 		this.checkAuth();
 		this.grabPacks();
@@ -176,11 +177,54 @@ export default {
 			localStorageIframe.id = 'localStorageIframe';
 			this.localStorage = document.body.appendChild(localStorageIframe).contentWindow.localStorage;
 		},
+		async appendPack(title, firstid, count) {
+			var mid = "startswith-" + firstid;
+			var files = [];
+			for (var i = firstid; i < (firstid + count); i += 1) {
+				files.push(i + ".png");
+			}
+			const availablePacks = this.localStorage.getItem('magane.available');
+			if (availablePacks) {
+				try {
+					this.availablePacks = JSON.parse(availablePacks);
+				} catch (ex) {
+					// Do nothing
+				}
+			}
+			this.availablePacks.push({
+				"id": mid,
+				"files": files,
+				"uploadPath": "/home/kana/magane/packs/" + mid,
+				"name": title,
+				"count": count,
+				"dirlinked": true
+			});
+			this.saveToLocalStorage('magane.available', this.availablePacks);
+		},
 		async grabPacks() {
 			const response = await fetch('https://magane.moe/api/packs');
 			const packs = await response.json();
 			this.baseURL = packs.baseURL;
-			this.availablePacks = packs.packs;
+
+			const availablePacks = this.localStorage.getItem('magane.available');
+			if (availablePacks) {
+				try {
+					this.availablePacks = JSON.parse(availablePacks);
+				} catch (ex) {
+					// Do nothing
+				}
+			}
+			if (!this.availablePacks) {
+				this.availablePacks = packs.packs;
+			} else {
+				packs.packs.forEach((e) => {
+					if (this.availablePacks.indexOf(e) < 0) {
+						this.availablePacks.push(e);
+					}
+				});
+			}
+			this.saveToLocalStorage('magane.available', this.availablePacks);
+			this.stickerfaces
 
 			const subscribedPacks = this.localStorage.getItem('magane.subscribed');
 			if (subscribedPacks) {
@@ -224,12 +268,42 @@ export default {
 		saveToLocalStorage: function(key, payload) {
 			this.localStorage.setItem(key, JSON.stringify(payload));
 		},
+		formatURL: function(packId, sticker) {
+			const a = "https://sdl-stickershop.line.naver.jp/stickershop/v1/sticker/";
+			const b = "/android/sticker.png;compress=true";
+			const c = "https://stickershop.line-scdn.net/stickershop/v1/product/";
+			const d = "/android/main@2x.png;compress=true";
+			var url;
+			var sticker2 = sticker.split(".", 1)[0];
+			if ((packId + "")[0] == "s") {
+				url = `${a}${sticker2}${b}`;
+				if ((sticker + "")[0] == "t") { // tab_on
+					url = `${c}${packId}${d}`;
+				}
+			} else {
+				url = `${this.baseURL}/${packId}/${sticker2}_key.png`;
+				if ((sticker + "")[0] == "t") { // tab_on
+					url = `${this.baseURL}/${packId}/${sticker2}.png`;
+				}
+			}
+			console.log(url);
+			return url;
+		},
 		async sendSticker(packId, sticker, token = this.localStorage.token) {
 			const channel = window.location.href.split('/').slice(-1)[0];
 			if (this.onCooldown) return;
 			this.onCooldown = true;
 			this.stickerWindowActive = false;
-			const response = await fetch(`${this.baseURL}/${packId}/${sticker}`, { cache: 'force-cache' });
+			const a = "https://sdl-stickershop.line.naver.jp/stickershop/v1/sticker/";
+			const b = "/android/sticker.png;compress=true";
+			var url;
+			if ((packId + "")[0] == "s") {
+				var sticker2 = sticker.split(".", 1)[0];
+				url = `${a}${sticker2}${b}`;
+			} else {
+				url = `${this.baseURL}/${packId}/${sticker}`;
+			}
+			const response = await fetch(url, { cache: 'force-cache' });
 			const myBlob = await response.blob();
 			const formData = new FormData();
 			formData.append('file', myBlob, sticker);
