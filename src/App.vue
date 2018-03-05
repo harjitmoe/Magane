@@ -280,10 +280,12 @@ export default {
 			const d = "/android/main@2x.png;compress=true";
 			var url;
 			var sticker2 = sticker.split(".", 1)[0];
+            var packId2 = packId.split("-")[1];
 			if ((packId + "")[0] == "s") {
 				url = `${a}${sticker2}${b}`;
 				if ((sticker + "")[0] == "t") { // tab_on
-					url = `${c}${packId}${d}`;
+					// url = `${c}${packId}${d}`; // if we had the actual ID
+                    url = `${a}${packId2}${b}`;
 				}
 			} else {
 				url = `${this.baseURL}/${packId}/${sticker2}_key.png`;
