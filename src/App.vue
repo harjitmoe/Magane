@@ -217,10 +217,15 @@ export default {
 			if (!this.availablePacks) {
 				this.availablePacks = packs.packs;
 			} else {
+				var aaa = [];
+				this.availablePacks.forEach((e) => aaa.push(e.id));
 				packs.packs.forEach((e) => {
-					if (this.availablePacks.indexOf(e) < 0) {
-						this.availablePacks.push(e);
+					while (aaa.indexOf(e.id) >= 0) {
+						var uuu = aaa.indexOf(e.id);
+						aaa.splice(uuu, 1);
+						this.availablePacks.splice(uuu, 1);
 					}
+					this.availablePacks.push(e);
 				});
 			}
 			this.saveToLocalStorage('magane.available', this.availablePacks);
